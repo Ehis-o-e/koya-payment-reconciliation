@@ -5,17 +5,36 @@
 
 const fs = require("fs");
 
+const latestEvents = new Map();
+const lines = fs.readFileSync("payments.jsonl", "utf8").split("\n").filter((l) => l.length > 0);
+
+for (const line of lines) {
+  if (!line.trim()) continue;
+  let event;
+
+  try{
+    event = JSON.parse(line);
+  }catch {
+    continue;
+  }
+
+  if (!event.txn_id) continue;
+  const previous = latestEvents.get(event.txn_id);
+  if (!previous || event.ts > previous.ts) {
+    latestEvents.set(event.txn_id, event);
+  }
+}
+
 let total = 0;
 let count = 0;
 
-const lines = fs.readFileSync("payments.jsonl", "utf8").split("\n").filter((l) => l.length > 0);
-for (const line of lines) {
-  const event = JSON.parse(line);
+for (const event of latestEvents.values()) {
   if (event.status === "success") {
-    total += Number(event.amount);
+    total += Number(String(event.amount).replaceAll(",", ""));
     count += 1;
   }
 }
+
 
 const expected = parseInt(fs.readFileSync("expected.txt", "utf8").trim(), 10);
 
